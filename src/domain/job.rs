@@ -375,3 +375,66 @@ impl Job {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::CommandBuilder;
+
+    fn create_test_job() -> Job {
+        let command = CommandBuilder::new()
+            .input(PathBuf::from("input.mp4"))
+            .output(PathBuf::from("output.mp4"))
+            .build()
+            .unwrap();
+
+        let config = JobConfig::new(
+            PathBuf::from("input.mp4"),
+            PathBuf::from("output.mp4"),
+            command,
+        );
+
+        Job::new(config)
+    }
+
+    #[test]
+    fn job_state_transition() {
+        let mut job = create_test_job();
+        assert!(matches!(job.status(), JobStatus::Pending));
+
+        job.queue();
+        assert!(matches!(job.status(), JobStatus::Queued));
+
+        job.start();
+        assert!(job.status().is_running());
+
+        job.complete(1000);
+        assert!(job.status().is_terminal());
+    }
+
+    #[test]
+    fn job_failure_and_retry() {
+        let mut job = create_test_job();
+        job.queue();
+        job.start();
+        job.fail("Test error".to_string());
+
+        assert!(matches!(job.status(), JobStatus::Failed { .. }));
+        assert!(job.requeue());
+        assert!(matches!(job.status(), JobStatus::Queued));
+    }
+
+    #[test]
+    fn job_progress_eta() {
+        let progress = JobProgress {
+            percentage: 50.0,
+            speed: 2.0,
+            time_encoded: 30.0,
+            ..Default::default()
+        };
+
+        let eta = progress.eta_in_seconds(60.0);
+        assert!(eta.is_some());
+        assert!((eta.unwrap() - 15.0).abs() < 0.01)
+    }
+}
