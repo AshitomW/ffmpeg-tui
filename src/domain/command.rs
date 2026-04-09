@@ -437,3 +437,82 @@ impl CommandBuilder {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn build_basic_command() {
+        let cmd = CommandBuilder::new()
+            .input(PathBuf::from("input.mp4"))
+            .output(PathBuf::from("output.mp4"))
+            .build()
+            .unwrap();
+
+        let args = cmd.to_args();
+
+        println!("{:?}", args);
+
+        assert!(args.contains(&"-i".to_string()));
+        assert!(args.contains(&"input.mp4".to_string()));
+        assert!(args.contains(&"output.mp4".to_string()))
+    }
+
+    #[test]
+    fn build_with_codecs() {
+        let cmd = CommandBuilder::new()
+            .input(PathBuf::from("input.mp4"))
+            .output(PathBuf::from("output.mp4"))
+            .video_codec(VideoCodec::H265)
+            .audio_codec(AudioCodec::Opus)
+            .build()
+            .unwrap();
+
+        let args = cmd.to_args();
+        println!("{:?}", args);
+        assert!(args.contains(&"libx265".to_string()));
+        assert!(args.contains(&"libopus".to_string()));
+    }
+
+    #[test]
+    fn build_with_filters() {
+        use crate::domain::{ScaleDimension, VideoFilter};
+
+        let mut filters = FilterChain::new();
+        filters.add_video_filter(VideoFilter::Scale {
+            width: ScaleDimension::Exact(1920),
+            height: ScaleDimension::Exact(1080),
+        });
+
+        let cmd = CommandBuilder::new()
+            .input(PathBuf::from("input.mp4"))
+            .output(PathBuf::from("output.mp4"))
+            .filters(filters)
+            .build()
+            .unwrap();
+
+        let args = cmd.to_args();
+        println!("{:?}", args);
+        assert!(args.contains(&"-vf".to_string()));
+
+        assert!(args.contains(&"scale=1920:1080".to_string()));
+    }
+    #[test]
+    fn error_on_missing_input() {
+        let result = CommandBuilder::new()
+            .output(PathBuf::from("output.mp4"))
+            .build();
+
+        assert!(matches!(result, Err(CommandBuildError::NoInput)));
+    }
+
+    #[test]
+    fn error_on_missing_output() {
+        let result = CommandBuilder::new()
+            .input(PathBuf::from("input.mp4"))
+            .build();
+
+        assert!(matches!(result, Err(CommandBuildError::NoOutput)));
+    }
+}
