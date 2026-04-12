@@ -10,4 +10,6 @@ pub use command::{CommandBuilder, FFMpegCommand};
 pub use filter::{AudioFilter, Filter, FilterChain, ScaleDimension, VideoFilter};
 pub use format::{ContainerFormat, OutputFormat};
 pub use job::{Job, JobConfig, JobId, JobPriority, JobProgress, JobResult, JobStatus};
-pub use media_info::{AudioStream, MediaInfo, StreamInfo, VideoStream};
+pub use media_info::{
+    AudioStream, DataStream, FormatInfo, MediaInfo, StreamInfo, SubtitleStream, VideoStream,
+};
