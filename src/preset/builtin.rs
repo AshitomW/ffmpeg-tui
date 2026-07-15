@@ -104,11 +104,16 @@ impl Preset {
         self.audio_bitrate = Some(bitrate);
         self
     }
+
+    #[must_use]
+    pub fn with_filters(mut self, filters: FilterChain) -> Self {
+        self.filters = filters;
+        self
+    }
 }
 
 #[must_use]
 pub fn builtin_presets() -> Vec<Preset> {
-    // These presets are what i commonly use, so i added them directly in code.
     vec![
         Preset::new(
             "High quality compress",
@@ -137,7 +142,6 @@ pub fn builtin_presets() -> Vec<Preset> {
             .with_crf(30)
             .with_encoding_preset(EncodingPreset::Slow)
             .with_audio_bitrate(96),
-        // Conversion presets
         Preset::new("WebM VP9", "Convert to WebM format with VP9 and Opus")
             .with_category(PresetCategory::Conversion)
             .with_video_codec(VideoCodec::Vp9)
@@ -150,13 +154,17 @@ pub fn builtin_presets() -> Vec<Preset> {
             .with_video_codec(VideoCodec::ProRes)
             .with_audio_codec(AudioCodec::Pcm)
             .with_container(ContainerFormat::Mov),
-        // Audio Extraction
         Preset::new("Extract MP3", "Extract audio to MP3 Format")
             .with_category(PresetCategory::AudioExtraction)
             .with_video_codec(VideoCodec::None)
             .with_audio_codec(AudioCodec::Mp3)
             .with_container(ContainerFormat::Mp3)
-            .with_audio_bitrate(320),
+            .with_audio_bitrate(320)
+            .with_filters({
+                let mut fc = FilterChain::new();
+                fc.add_audio_filter(crate::domain::AudioFilter::Normalize);
+                fc
+            }),
         Preset::new("Extract FLAC", "Extract audio to FLAC")
             .with_category(PresetCategory::AudioExtraction)
             .with_video_codec(VideoCodec::None)
@@ -168,7 +176,6 @@ pub fn builtin_presets() -> Vec<Preset> {
             .with_audio_codec(AudioCodec::Opus)
             .with_container(ContainerFormat::Ogg)
             .with_audio_bitrate(192),
-        // Generic presets , that i dont use , just added becuase i could
         Preset::new("Youtube Upload", "For Youtube Uploads")
             .with_category(PresetCategory::Streaming)
             .with_video_codec(VideoCodec::H264)
@@ -192,8 +199,15 @@ pub fn builtin_presets() -> Vec<Preset> {
             .with_container(ContainerFormat::Mp4)
             .with_crf(20)
             .with_encoding_preset(EncodingPreset::Medium)
-            .with_audio_bitrate(192),
-        // Archives
+            .with_audio_bitrate(192)
+            .with_filters({
+                let mut fc = FilterChain::new();
+                fc.add_video_filter(crate::domain::VideoFilter::Scale {
+                    width: crate::domain::ScaleDimension::Exact(1080),
+                    height: crate::domain::ScaleDimension::Exact(1920),
+                });
+                fc
+            }),
         Preset::new("Kind of lossless archive", "Lossless copy for archival")
             .with_category(PresetCategory::Archive)
             .with_video_codec(VideoCodec::Copy)

@@ -1,5 +1,3 @@
-//! Container format defns
-
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -21,7 +19,6 @@ pub enum ContainerFormat {
 }
 
 impl ContainerFormat {
-    /// Return extension for the format
     #[must_use]
     pub const fn extension(&self) -> &'static str {
         match self {
@@ -39,7 +36,6 @@ impl ContainerFormat {
         }
     }
 
-    /// return format name
     #[must_use]
     pub const fn ffmpeg_name(&self) -> &'static str {
         match self {
@@ -75,7 +71,6 @@ impl ContainerFormat {
         &[Self::Mp3, Self::Flac, Self::Wav, Self::Ogg]
     }
 
-    /// Check if format has video support
     #[must_use]
     pub const fn supports_video(&self) -> bool {
         matches!(
@@ -84,7 +79,6 @@ impl ContainerFormat {
         )
     }
 
-    /// Try to determine format from extension
     pub fn from_extension(ext: &str) -> Option<Self> {
         let ext = ext.to_lowercase();
         match ext.as_str() {
@@ -123,7 +117,6 @@ impl fmt::Display for ContainerFormat {
     }
 }
 
-/// Encoding speed preset
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum EncodingPreset {
@@ -199,8 +192,6 @@ impl Default for OutputFormat {
         }
     }
 }
-
-// Tests
 
 #[cfg(test)]
 mod tests {

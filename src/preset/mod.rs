@@ -28,7 +28,7 @@ pub fn load_user_presets(dir: &Path) -> Result<Vec<Preset>, PresetError> {
         let entry = entry?;
         let path = entry.path();
 
-        if path.extension().map_or(false, |e| e == "toml") {
+        if path.extension().is_some_and(|e| e == "toml") {
             let content = std::fs::read_to_string(&path)?;
             let preset: Preset =
                 toml::from_str(&content).map_err(|e| PresetError::ParseError(e.to_string()))?;

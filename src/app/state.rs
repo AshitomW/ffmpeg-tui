@@ -1,3 +1,5 @@
+use crate::app::file_browser::FileBrowserState;
+use crate::app::filter_dialog::FilterDialogState;
 use crate::domain::{Job, JobConfig, JobId, MediaInfo};
 use crate::infra::{FFMpegExecutor, FFProbeExecutor};
 use crate::preset::Preset;
@@ -43,15 +45,43 @@ impl Screen {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct BuilderState {
     pub input_path: Option<PathBuf>,
     pub output_path: Option<PathBuf>,
     pub selected_preset: Option<String>,
     pub input_info: Option<MediaInfo>,
+    pub video_codec: crate::domain::VideoCodec,
+    pub audio_codec: crate::domain::AudioCodec,
+    pub format: crate::domain::ContainerFormat,
+    pub crf: u8,
+    pub preset: crate::domain::EncodingPreset,
+    pub filters: crate::domain::FilterChain,
+    pub preset_index: usize,
     pub current_field: BuilderField,
     pub raw_command_mode: bool,
     pub raw_command: String,
+}
+
+impl Default for BuilderState {
+    fn default() -> Self {
+        Self {
+            input_path: None,
+            output_path: None,
+            selected_preset: None,
+            input_info: None,
+            video_codec: crate::domain::VideoCodec::default(),
+            audio_codec: crate::domain::AudioCodec::default(),
+            format: crate::domain::ContainerFormat::default(),
+            crf: 23,
+            preset: crate::domain::EncodingPreset::default(),
+            filters: crate::domain::FilterChain::default(),
+            preset_index: 0,
+            current_field: BuilderField::default(),
+            raw_command_mode: false,
+            raw_command: String::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -93,12 +123,41 @@ impl BuilderField {
             Self::Filters => "Filters",
         }
     }
+
+    #[must_use]
+    pub const fn next(&self) -> Self {
+        match self {
+            Self::Input => Self::Output,
+            Self::Output => Self::VideoCodec,
+            Self::VideoCodec => Self::AudioCodec,
+            Self::AudioCodec => Self::Format,
+            Self::Format => Self::Quality,
+            Self::Quality => Self::Preset,
+            Self::Preset => Self::Filters,
+            Self::Filters => Self::Input,
+        }
+    }
+
+    #[must_use]
+    pub const fn prev(&self) -> Self {
+        match self {
+            Self::Input => Self::Filters,
+            Self::Output => Self::Input,
+            Self::VideoCodec => Self::Output,
+            Self::AudioCodec => Self::VideoCodec,
+            Self::Format => Self::AudioCodec,
+            Self::Quality => Self::Format,
+            Self::Preset => Self::Quality,
+            Self::Filters => Self::Preset,
+        }
+    }
 }
 
 #[derive(Debug, Default)]
 pub struct QueueState {
     pub selected_index: usize,
     pub show_completed: bool,
+    pub is_paused: bool,
 }
 
 #[derive(Debug, Default)]
@@ -126,10 +185,13 @@ pub struct ApplicationState {
     pub queue_state: QueueState,
     pub logs_state: LogsState,
     pub inspector: InspectorState,
+    pub file_browser: Option<FileBrowserState>,
+    pub filter_dialog: Option<FilterDialogState>,
 
     jobs: Arc<RwLock<HashMap<JobId, Job>>>,
     job_queue: Arc<Mutex<VecDeque<JobId>>>,
     active_jobs: Arc<RwLock<Vec<JobId>>>,
+    running_tasks: Arc<Mutex<HashMap<JobId, tokio::task::JoinHandle<()>>>>,
 
     pub presets: Vec<Preset>,
 
@@ -157,9 +219,12 @@ impl ApplicationState {
                 ..Default::default()
             },
             inspector: InspectorState::default(),
+            file_browser: None,
+            filter_dialog: None,
             jobs: Arc::new(RwLock::new(HashMap::new())),
             job_queue: Arc::new(Mutex::new(VecDeque::new())),
             active_jobs: Arc::new(RwLock::new(Vec::new())),
+            running_tasks: Arc::new(Mutex::new(HashMap::new())),
             presets: crate::preset::builtin_presets(),
             ffmpeg: Arc::new(ffmpeg),
             ffprobe: Arc::new(ffprobe),
@@ -193,6 +258,23 @@ impl ApplicationState {
         &self.active_jobs
     }
 
+    pub async fn register_task(&self, id: JobId, handle: tokio::task::JoinHandle<()>) {
+        let mut tasks = self.running_tasks.lock().await;
+        tasks.insert(id, handle);
+    }
+
+    pub async fn cancel_task(&self, id: JobId) {
+        let mut tasks = self.running_tasks.lock().await;
+        if let Some(handle) = tasks.remove(&id) {
+            handle.abort();
+        }
+    }
+
+    pub async fn remove_task(&self, id: JobId) {
+        let mut tasks = self.running_tasks.lock().await;
+        tasks.remove(&id);
+    }
+
     pub async fn add_job(&self, config: JobConfig) -> JobId {
         let mut job = Job::new(config);
         let id = job.id();
@@ -224,8 +306,22 @@ impl ApplicationState {
     pub async fn get_sorted_job_ids(&self) -> Vec<JobId> {
         let jobs = self.jobs.read().await;
         let mut entries: Vec<_> = jobs.values().collect();
-        entries.sort_by(|a, b| b.created_at().cmp(&a.created_at()));
+        entries.sort_by_key(|j| std::cmp::Reverse(j.created_at()));
         entries.iter().map(|j| j.id()).collect()
+    }
+
+    pub async fn move_job_up(&self, id: JobId) {
+        let mut queue = self.job_queue.lock().await;
+        if let Some(idx) = queue.iter().position(|&j| j == id).filter(|&i| i > 0) {
+            queue.swap(idx, idx - 1);
+        }
+    }
+
+    pub async fn move_job_down(&self, id: JobId) {
+        let mut queue = self.job_queue.lock().await;
+        if let Some(idx) = queue.iter().position(|&j| j == id).filter(|&i| i + 1 < queue.len()) {
+            queue.swap(idx, idx + 1);
+        }
     }
 
     pub async fn pending_job_count(&self) -> usize {
@@ -259,3 +355,4 @@ impl ApplicationState {
         self.running = false;
     }
 }
+

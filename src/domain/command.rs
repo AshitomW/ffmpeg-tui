@@ -90,18 +90,18 @@ impl OutputConfig {
             }
         }
 
-        if let Some(crf) = self.crf {
-            if self.video_codec.supports_crf() {
-                args.push("-crf".to_string());
-                args.push(crf.to_string());
-            }
+        if let Some(crf) = self.crf.filter(|_| self.video_codec.supports_crf()) {
+            args.push("-crf".to_string());
+            args.push(crf.to_string());
         }
 
-        if let Some(preset) = &self.preset {
-            if matches!(self.video_codec, VideoCodec::H264 | VideoCodec::H265) {
-                args.push("-preset".to_string());
-                args.push(preset.ffmpeg_name().to_string());
-            }
+        if let Some(preset) = self
+            .preset
+            .as_ref()
+            .filter(|_| matches!(self.video_codec, VideoCodec::H264 | VideoCodec::H265))
+        {
+            args.push("-preset".to_string());
+            args.push(preset.ffmpeg_name().to_string());
         }
 
         if let Some(vb) = self.video_bitrate {
@@ -249,9 +249,17 @@ impl FFMpegCommand {
     #[must_use]
     pub fn to_command_string(&self) -> String {
         let args = self.to_args();
-        let args_ref: Vec<&str> = args.iter().map(String::as_str).collect();
-
-        format!("ffmpeg {}", shellwords::join(&args_ref))
+        let formatted: Vec<String> = args
+            .into_iter()
+            .map(|arg| {
+                if arg.contains(' ') || arg.contains(';') {
+                    format!("\"{arg}\"")
+                } else {
+                    arg
+                }
+            })
+            .collect();
+        format!("ffmpeg {}", formatted.join(" "))
     }
 
     #[must_use]
@@ -393,7 +401,7 @@ impl CommandBuilder {
     pub fn video_bitrate(mut self, bitrate: u32) -> Self {
         if let Some(output) = &mut self.output {
             output.video_bitrate = Some(bitrate);
-            output.crf = None; // Enforce mutually exclusive rate control modes (CRF vs bitrate)
+            output.crf = None;
         }
         self
     }

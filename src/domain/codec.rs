@@ -1,13 +1,9 @@
-//! Codec defintions for audio and video
-
 use core::fmt;
 
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
-
-/// Video codec options
 pub enum VideoCodec {
     #[default]
     H264,
@@ -21,7 +17,6 @@ pub enum VideoCodec {
 }
 
 impl VideoCodec {
-    /// Returns the codec name
     #[must_use]
     pub const fn ffmpeg_name(&self) -> &'static str {
         match self {
@@ -36,7 +31,6 @@ impl VideoCodec {
         }
     }
 
-    /// Return available ones
     #[must_use]
     pub const fn all() -> &'static [Self] {
         &[
@@ -50,7 +44,6 @@ impl VideoCodec {
         ]
     }
 
-    /// Return whether codec supprots CRF Quality
     #[must_use]
     pub const fn supports_crf(&self) -> bool {
         matches!(self, Self::H264 | Self::H265 | Self::Vp9 | Self::Av1)
@@ -73,7 +66,6 @@ impl fmt::Display for VideoCodec {
     }
 }
 
-/// Audio Codec options
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum AudioCodec {
@@ -90,7 +82,6 @@ pub enum AudioCodec {
 }
 
 impl AudioCodec {
-    /// Return the codec name
     #[must_use]
     pub const fn ffmpeg_name(&self) -> &'static str {
         match self {
@@ -106,7 +97,6 @@ impl AudioCodec {
         }
     }
 
-    /// Return all available codecs
     #[must_use]
     pub const fn all() -> &'static [Self] {
         &[
@@ -121,7 +111,6 @@ impl AudioCodec {
         ]
     }
 
-    /// return default bitrate for codec in kbps
     #[must_use]
     pub const fn default_bitrate(&self) -> u32 {
         match self {
@@ -152,7 +141,6 @@ impl fmt::Display for AudioCodec {
     }
 }
 
-// Simple Tests
 #[cfg(test)]
 mod tests {
     use crate::domain::codec::{AudioCodec, VideoCodec};

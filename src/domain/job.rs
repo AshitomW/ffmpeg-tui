@@ -31,8 +31,6 @@ impl std::fmt::Display for JobId {
     }
 }
 
-/// For Job execution priority
-
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
 )]
@@ -56,7 +54,6 @@ impl std::fmt::Display for JobPriority {
     }
 }
 
-/// Job Progress
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct JobProgress {
     pub frame: u64,
@@ -69,7 +66,6 @@ pub struct JobProgress {
 }
 
 impl JobProgress {
-    /// Estimate time
     #[must_use]
     pub fn eta_in_seconds(&self, total_duration: f64) -> Option<f64> {
         if self.speed > 0.0 && self.percentage < 100.0 {
@@ -80,7 +76,6 @@ impl JobProgress {
         }
     }
 
-    /// Human readable formatting
     #[must_use]
     pub fn eta_string(&self, total_duration: f64) -> String {
         match self.eta_in_seconds(total_duration) {
@@ -106,9 +101,9 @@ fn format_duration(seconds: u64) -> String {
     }
 }
 
-/// Status of the job
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub enum JobStatus {
+    #[default]
     Pending,
     Queued,
     Running {
@@ -131,7 +126,6 @@ pub enum JobStatus {
 }
 
 impl JobStatus {
-    /// true if job is in terminal state
     #[must_use]
     pub const fn is_terminal(&self) -> bool {
         matches!(
@@ -140,19 +134,16 @@ impl JobStatus {
         )
     }
 
-    /// true if job is retryable
     #[must_use]
     pub const fn can_retry(&self) -> bool {
         matches!(self, Self::Failed { .. } | Self::Cancelled)
     }
 
-    /// rtrue if the job is running
     #[must_use]
     pub const fn is_running(&self) -> bool {
         matches!(self, Self::Running { .. })
     }
 
-    /// status name
     #[must_use]
     pub const fn name(&self) -> &'static str {
         match self {
@@ -167,13 +158,6 @@ impl JobStatus {
     }
 }
 
-impl Default for JobStatus {
-    fn default() -> Self {
-        Self::Pending
-    }
-}
-
-/// Configuration for the job
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JobConfig {
     pub input_path: PathBuf,

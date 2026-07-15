@@ -1,4 +1,3 @@
-///! Filter defintions for video and audio processing
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -66,7 +65,8 @@ impl VideoFilter {
     pub fn to_ffmpeg_string(&self) -> String {
         match self {
             Self::Scale { width, height } => {
-                format!("scale={}:{}", width.to_ffmpeg(), height.to_ffmpeg())
+                let res: String = format!("scale={}:{}", width.to_ffmpeg(), height.to_ffmpeg());
+                res
             }
             Self::Crop {
                 width,
@@ -74,7 +74,8 @@ impl VideoFilter {
                 x,
                 y,
             } => {
-                format!("crop={width}:{height}:{x}:{y}")
+                let res: String = format!("crop={width}:{height}:{x}:{y}");
+                res
             }
             Self::Fps { rate } => format!("fps={rate}"),
             Self::Rotate { angle } => angle.to_ffmpeg_filter(),
@@ -86,17 +87,21 @@ impl VideoFilter {
                 y,
                 color,
             } => {
-                format!("pad={width}:{height}:{x}:{y}:{color}")
+                let res: String = format!("pad={width}:{height}:{x}:{y}:{color}");
+                res
             }
             Self::Trim { start, end } => {
-                let mut parts = Vec::new();
-                if let Some(s) = start {
-                    parts.push(format!("start={s}"));
+                let mut parts: Vec<String> = Vec::new();
+                if let Some(s) = *start {
+                    let s_str: String = format!("start={s}");
+                    parts.push(s_str);
                 }
-                if let Some(e) = end {
-                    parts.push(format!("end={e}"));
+                if let Some(e) = *end {
+                    let e_str: String = format!("end={e}");
+                    parts.push(e_str);
                 }
-                format!("trim={}", parts.join(":"))
+                let res: String = format!("trim={}", parts.join(":"));
+                res
             }
             Self::Deinterlace => "yadif".to_string(),
             Self::Denoise { strength } => format!("hqdn3d={}", strength.value()),
@@ -131,7 +136,6 @@ impl VideoFilter {
     }
 }
 
-///Dimension specification for scaling
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ScaleDimension {
     Exact(u32),
@@ -149,7 +153,6 @@ impl ScaleDimension {
     }
 }
 
-/// Rotation Angle Options
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RotationAngle {
     Clockwise90,
@@ -160,6 +163,7 @@ pub enum RotationAngle {
 }
 
 impl RotationAngle {
+    #[allow(clippy::wrong_self_convention)]
     fn to_ffmpeg_filter(&self) -> String {
         match self {
             Self::Clockwise90 => "transpose=1".to_string(),
@@ -171,7 +175,6 @@ impl RotationAngle {
     }
 }
 
-/// Denoise Strength Levels
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum DenoiseStrength {
     Light,
@@ -190,7 +193,6 @@ impl DenoiseStrength {
     }
 }
 
-/// Audio filter with typed Params
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AudioFilter {
     Volume {
@@ -233,7 +235,8 @@ impl AudioFilter {
                 start,
                 duration,
             } => {
-                format!("a{}=st={start}:d={duration}", fade_type.name())
+                let res: String = format!("a{}=st={start}:d={duration}", fade_type.name());
+                res
             }
             Self::HighPass { frequency } => format!("highpass=f={frequency}"),
             Self::LowPass { frequency } => format!("lowpass=f={frequency}"),
@@ -302,7 +305,6 @@ impl Filter {
     }
 }
 
-// Chain of filter to be applied in order
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct FilterChain {
     video_filters: Vec<VideoFilter>,
@@ -316,11 +318,31 @@ impl FilterChain {
     }
 
     pub fn add_video_filter(&mut self, filter: VideoFilter) {
-        self.video_filters.push(filter);
+        if matches!(filter, VideoFilter::Custom { .. }) {
+            self.video_filters.push(filter);
+        } else if let Some(existing) = self
+            .video_filters
+            .iter_mut()
+            .find(|f| std::mem::discriminant(*f) == std::mem::discriminant(&filter))
+        {
+            *existing = filter;
+        } else {
+            self.video_filters.push(filter);
+        }
     }
 
     pub fn add_audio_filter(&mut self, filter: AudioFilter) {
-        self.audio_filters.push(filter);
+        if matches!(filter, AudioFilter::Custom { .. }) {
+            self.audio_filters.push(filter);
+        } else if let Some(existing) = self
+            .audio_filters
+            .iter_mut()
+            .find(|f| std::mem::discriminant(*f) == std::mem::discriminant(&filter))
+        {
+            *existing = filter;
+        } else {
+            self.audio_filters.push(filter);
+        }
     }
 
     pub fn remove_video_filter(&mut self, index: usize) -> Option<VideoFilter> {
@@ -404,5 +426,29 @@ impl FilterChain {
     pub fn clear(&mut self) {
         self.video_filters.clear();
         self.audio_filters.clear();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_filter_replacement() {
+        let mut chain = FilterChain::new();
+        chain.add_video_filter(VideoFilter::Scale {
+            width: ScaleDimension::Exact(1920),
+            height: ScaleDimension::Exact(1080),
+        });
+        assert_eq!(chain.video_filters().len(), 1);
+        assert_eq!(chain.video_filter_string().unwrap(), "scale=1920:1080");
+
+        // Adding another scale filter replaces the existing scale filter
+        chain.add_video_filter(VideoFilter::Scale {
+            width: ScaleDimension::Exact(1280),
+            height: ScaleDimension::Exact(720),
+        });
+        assert_eq!(chain.video_filters().len(), 1);
+        assert_eq!(chain.video_filter_string().unwrap(), "scale=1280:720");
     }
 }

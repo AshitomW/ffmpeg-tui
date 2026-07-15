@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use crate::app::file_browser::FileBrowserTarget;
 use crate::domain::{
     AudioCodec, ContainerFormat, EncodingPreset, Filter, JobId, JobProgress, VideoCodec,
 };
@@ -16,10 +17,10 @@ pub enum NavigationTarget {
 
 #[derive(Debug, Clone)]
 pub enum Action {
-    Nviagte(NavigationTarget),
+    Navigate(NavigationTarget),
     NavigateBack,
 
-    Quic,
+    Quit,
     Tick,
 
     SetInput(PathBuf),
@@ -35,6 +36,33 @@ pub enum Action {
     BuildJob,
     ToggleRawCommandMode,
     SetRawCommand(String),
+    RawCommandAppend(char),
+    RawCommandBackspace,
+
+    // File browser actions
+    OpenFileBrowser(FileBrowserTarget),
+    FileBrowserNavigateUp,
+    FileBrowserConfirm,
+    FileBrowserCancel,
+    FileBrowserSelectPrev,
+    FileBrowserSelectNext,
+    FileBrowserFilterAppend(char),
+    FileBrowserFilterBackspace,
+    FileBrowserFilenameAppend(char),
+    FileBrowserFilenameBackspace,
+
+    // Filter dialog actions
+    OpenFilterDialog,
+    CloseFilterDialog,
+    FilterDialogNextTab,
+    FilterDialogPrevTab,
+    FilterDialogSelectNext,
+    FilterDialogSelectPrev,
+    FilterDialogConfirm,
+    FilterDialogRemoveSelected,
+    FilterDialogClearAll,
+    FilterDialogCustomAppend(char),
+    FilterDialogCustomBackspace,
 
     StartQueue,
     PauseQueue,
